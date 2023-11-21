@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Get the latest code from the remote GitHub repository
+                git 'https://github.com/iamsaksham06/labfat_centralrepo'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Build the Maven project
+                pat 'mvn clean install'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                // Build Docker image
+                pat 'docker build -t docker_labfat .'
+            }
+        }
+
+        stage('Push to Docker Repository') {
+            steps {
+                // Push Docker image to the central Docker repository
+                withCredentials([usernamePassword(credentialsId: 'docker-credentials-id', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    pat "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                    pat 'docker push docker_labfat'
+                }
+            }
+        }
+
+        stage('Error Handling') {
+            steps {
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                    // This stage will only execute if any of the previous stages fail
+                    error 'There was a failure in the pipeline!'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Clean up (optional)
+            deleteDir()
+        }
+    }
+}
